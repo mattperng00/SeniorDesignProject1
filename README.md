@@ -1,2 +1,2 @@
 # SeniorDesignProject1
-#johnnyhasbeenhere
+#TeamMembers: Johnny, Matt, Billy, Ifeanyi
