@@ -1,6 +1,5 @@
 /*
   LiquidCrystal Library - Hello World
-
   The circuit:
  * LCD RS pin to digital pin 12
  * LCD Enable pin to digital pin 11
@@ -47,23 +46,23 @@ void setup() {
   pinMode(6, OUTPUT); // Cooling LED
   pinMode(7, OUTPUT); // Heating LED
   pinMode(8, OUTPUT); //Fan
-  
+
   // set up the LCD's number of columns and rows:
   lcd.begin(LCD_Rows, LCD_Cols);
   // Print a message to the LCD.
   lcd.print("Temperature");
-  
+
   digitalWrite(6, HIGH); //Turns LED OFF
   digitalWrite(7, HIGH); //Turns LED OFF
   digitalWrite(8, HIGH);
 }
-  
+
 void loop() {
   // set the cursor to column 0, line 1
   // (note: line 1 is the second row, since counting begins with 0):
   currTemp = -40 + 0.488155 * (analogRead(A0) - 20);
   lcd.setCursor(2, 2);
-  
+
   //if function so screen doesn't clear on every loop, otherwise screen flashes on every loop
   if(currTemp != pastTemp)
   {
@@ -71,7 +70,7 @@ void loop() {
      pastTemp = currTemp;
      lcd.print("Temp: ");
      Serial.println(currTemp);
-  
+
      lcd.setCursor(6, 0);
      lcd.print(currTemp);
      lcd.setCursor(9,0);
