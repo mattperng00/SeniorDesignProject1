@@ -1,4 +1,4 @@
 # SeniorDesignProject1
+Team Members: Matt, Johnny, Billy, Ifeanyi
 
-Why is this hard
 
