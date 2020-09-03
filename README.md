@@ -1,2 +1,5 @@
 # SeniorDesignProject1
-#TeamMembers: Johnny, Billy, Matt, Ifeanyi
+Team Members: Matt, Johnny, Billy, Ifeanyi
+
+
+johnnys merge
