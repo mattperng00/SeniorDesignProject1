@@ -21,8 +21,8 @@
 #define HEAT_LED 
 #define FAN 
 #define ALARM 
+#define TEMP_SENSOR A0
 
-// TODO: Define IO ports and other things
 enum temp_diff {EVEN, LOW, HIGH, VERY_HIGH}
 enum temp_scale {CEL, FAHR} // Temperature will be handled internally as Celsius, but can be displayed as Celsius or Fahrenheit
 enum device_state {OFF, ON}
@@ -71,8 +71,7 @@ void loop() {
 /* ------------------------------ IO functions ------------------------------ */
 
 int read_temp() {
-    // int temp = ;
-    // TODO: Read in temp as integer
+    return -40 + 0.488155 * (analogRead(TEMP_SENSOR) - 20);
 }
 
 void update_display() {
@@ -104,12 +103,22 @@ void update_display() {
 
 void fan_led(device_state ds) {
     // TODO: Turn blue led on off based on ds
-    digitalWrite(FAN_LED, (ds == ON) ? HIGH : LOW);
+    if (ds == ON) {
+        digitalWrite(FAN_LED, HIGH);
+    }
+    else {
+        digitalWrite(FAN_LED, LOW);
+    }
 }
 
 void heat_led(device_state ds) {
     // TODO: Turn red led on off based on ds
-    digitalWrite(HEAT_LED, (ds == ON) ? HIGH : LOW);
+    if (ds == ON) {
+        digitalWrite(HEAT_LED, HIGH);
+    }
+    else {
+        digitalWrite(HEAT_LED, LOW);
+    }
 }
 
 void fan(device_state ds) {
@@ -133,38 +142,63 @@ void temp_ctrl(temp_diff td) {
         case EVEN:
             switch (td) {
                 case LOW:
-                    // TODO: Activate blue LED, display "Fan On", turn fan on
+                    fan_led(ON);
+                    fan(ON);
+                    break;
                 case HIGH:
-                    // TODO: Activate red LED, display "Heat On"
+                    heat_led(ON);
+                    break;
                 case VERY_HIGH:
-                    // TODO: Activate red LED, display "Heat On", turn alarm on
+                    heat_led(ON);
+                    alarm(ON);
             }
+            break;
         case LOW:
             switch (td) {
                 case EVEN:
-                    // TODO: Deactivate blue LED, remove "Fan On"
+                    fan_led(OFF);
+                    fan(OFF);
+                    break
                 case HIGH:
-                    // TODO: Deactivate blue LED, remove "Fan On", activate red LED, display "Heat On"
+                    fan_led(OFF);
+                    fan(OFF);
+                    heat_led(ON);
+                    break;
                 case VERY_HIGH:
-                    // TODO: Deactivate blue LED, remove "Fan On", activate red LED, display "Heat On", turn alarm on
+                    fan_led(OFF);
+                    fan(OFF);
+                    heat_led(ON);
+                    alarm(ON);
             }
+            break;
         case HIGH:
             switch (td) {
                 case EVEN:
-                    // TODO: Deactivate red LED, remove "Heat On"
+                    heat_led(OFF);
+                    break;
                 case LOW:
-                    // TODO: Deactivate red LED, remove "Heat On", activate blue LED, display "Fan On"
+                    heat_led(OFF);
+                    fan_led(ON);
+                    fan(ON);
+                    break;
                 case VERY_HIGH:
-                    // TODO: Turn alarm on
+                    alarm(ON);
             }
+            break;
         case VERY_HIGH:
             switch (td) {
                 case EVEN:
-                    // TODO: Deactivate red LED, remove "Heat On", turn alarm off
+                    heat_led(OFF);
+                    alarm(OFF);
+                    break;
                 case LOW:
-                    // TODO: Deactivate red LED, remove "Heat On", turn alarm off, activate blue LED, display "Fan On"
+                    heat_led(OFF);
+                    alarm(OFF);
+                    fan_led(ON);
+                    fan(ON);
+                    break;
                 case HIGH:
-                    // TODO: Turn alarm off
+                    alarm(OFF);
             }
     }
     
