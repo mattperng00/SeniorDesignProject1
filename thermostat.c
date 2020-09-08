@@ -1,13 +1,18 @@
+/*
+    Authors: Ifeanyi Orizu Jr.
+    Filename: thermostat.c
+    Date: 
+    Description: 
+*/
 
-
-
+// TODO: Fix the #include(s)
 #include <stdio.h>
+#include <LiquidCrystal.h>
 #include thermostat.h
 
 /* ------------------------------ IO and State definitions ------------------------------ */
-
-#define LCD_ROWS 16
-#define LCD_COLS 2
+#define LCD_ROWS 2
+#define LCD_COLS 16
 
 // Pin assignments
 #define LCD_RS 12
@@ -17,6 +22,7 @@
 #define LCD_D6 3
 #define LCD_D7 2
 
+// TODO: Assign these IO pins
 #define FAN_LED 
 #define HEAT_LED 
 #define FAN 
@@ -29,7 +35,7 @@ enum device_state {OFF, ON}
 
 /* ------------------------------ State variables and Settings ------------------------------ */
 enum temp_diff current_temp_diff = EVEN;
-enum temp_scale current_temp_scale = CEL;
+volatile enum temp_scale current_temp_scale = CEL;
 volatile int set_temp;
 
 LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
@@ -38,11 +44,10 @@ void setup() {
     
     // TODO: Setup temp sensor
     
-    
-    // Setup temp scale input
+    // TODO: Setup temp scale input
     attachInterrupt(digitalPinToInterrupt(), temp_scale_isr, LOW)
     
-    // set_temp input device(s)
+    // TODO: Setup set_temp input device(s)
     
     // LEDs
     pinMode(FAN_LED, OUTPUT);
@@ -53,18 +58,17 @@ void setup() {
     pinMode(ALARM, OUTPUT);
   
     // LCD
-    lcd.begin(LCD_ROWS, LCD_COLS);
+    lcd.begin(LCD_COLS, LCD_ROWS);
 }
 
-/* ------------------------------ Loop ------------------------------ */
 void loop() {
-    setup();
+    enum temp_diff td;
     
     while (;;) {
-        temp_ctrl(evaluate_temp());
-        // Call update hardware funcs
-        update_display();
-        // Call a delay func that can be interrupted
+        temp_diff = evaluate_temp(); // Read temp and compute new temp_diff state
+        temp_ctrl(temp_diff); // Configure hardware based on current and next temp_diff states
+        update_display(); // Update LCD
+        // TODO: Call a delay function that can be interrupted
     }
 }
 
@@ -101,8 +105,7 @@ void update_display() {
     }
 }
 
-void fan_led(device_state ds) {
-    // TODO: Turn blue led on off based on ds
+void fan_led(device_state ds) {    // TODO: Turn blue led on off based on ds
     if (ds == ON) {
         digitalWrite(FAN_LED, HIGH);
     }
@@ -111,8 +114,7 @@ void fan_led(device_state ds) {
     }
 }
 
-void heat_led(device_state ds) {
-    // TODO: Turn red led on off based on ds
+void heat_led(device_state ds) {    // TODO: Turn red led on off based on ds
     if (ds == ON) {
         digitalWrite(HEAT_LED, HIGH);
     }
@@ -131,9 +133,7 @@ void alarm(device_state ds) {
 
 /* ------------------------------ State functions ------------------------------ */
 
-
 void temp_ctrl(temp_diff td) {
-    
     if (td == current_temp_diff) {
         return;
     }
@@ -231,15 +231,12 @@ enum temp_diff evaluate_temp() {
 
 /* ------------------------------ ISRs ------------------------------ */
 
-
 void raise_temp_isr() {
     set_temp += 1;
-    //evaluate_temp();
 }
 
 void lower_temp_isr() {
     set_temp -= 1;
-    //evaluate_temp();
 }
 
 void temp_scale_isr() {
