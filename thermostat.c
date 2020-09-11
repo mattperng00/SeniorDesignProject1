@@ -31,7 +31,6 @@
 
 enum temp_diff {EVEN, LOW, HIGH, VERY_HIGH}
 enum temp_scale {CEL, FAHR} // Temperature will be handled internally as Celsius, but can be displayed as Celsius or Fahrenheit
-enum device_state {OFF, ON}
 
 /* ------------------------------ State variables and Settings ------------------------------ */
 enum temp_diff current_temp_diff = EVEN;
@@ -44,10 +43,12 @@ void setup() {
     
     // TODO: Setup temp sensor
     
-    // TODO: Setup temp scale input
-    attachInterrupt(digitalPinToInterrupt(), temp_scale_isr, LOW)
-    
     // TODO: Setup set_temp input device(s)
+    attachInterrupt(digitalPinToInterrupt(), raise_temp_isr, LOW)
+    attachInterrupt(digitalPinToInterrupt(), lower_temp_isr, LOW)
+    
+    // TODO: Setup temp scale input
+    //attachInterrupt(digitalPinToInterrupt(), temp_scale_isr, LOW)
     
     // LEDs
     pinMode(FAN_LED, OUTPUT);
@@ -78,6 +79,10 @@ int read_temp() {
     return -40 + 0.488155 * (analogRead(TEMP_SENSOR) - 20);
 }
 
+bool read_switch() {
+    
+}
+
 void update_display() {
     noInterrupts();
     int temp = (current_temp_scale == CEL) ? set_temp : 9*set_temp/5 + 32;
@@ -105,30 +110,20 @@ void update_display() {
     }
 }
 
-void fan_led(device_state ds) {    // TODO: Turn blue led on off based on ds
-    if (ds == ON) {
-        digitalWrite(FAN_LED, HIGH);
-    }
-    else {
-        digitalWrite(FAN_LED, LOW);
-    }
+void fan_led(int state) {
+    digitalWrite(FAN_LED, state ? HIGH : LOW);
 }
 
-void heat_led(device_state ds) {    // TODO: Turn red led on off based on ds
-    if (ds == ON) {
-        digitalWrite(HEAT_LED, HIGH);
-    }
-    else {
-        digitalWrite(HEAT_LED, LOW);
-    }
+void heat_led(int state) {
+    digitalWrite(HEAT_LED, state ? HIGH : LOW);
 }
 
-void fan(device_state ds) {
-    // TODO: Turn fan motor on off based on ds
+void fan(int state) {
+    // TODO: Turn fan motor on off based on state
 }
 
-void alarm(device_state ds) {
-    // TODO: Turn alarm on off based on ds
+void alarm(int state) {
+    // TODO: Turn alarm on off based on state
 }
 
 /* ------------------------------ State functions ------------------------------ */
@@ -142,63 +137,63 @@ void temp_ctrl(temp_diff td) {
         case EVEN:
             switch (td) {
                 case LOW:
-                    fan_led(ON);
-                    fan(ON);
+                    fan_led(1);
+                    fan(1);
                     break;
                 case HIGH:
-                    heat_led(ON);
+                    heat_led(1);
                     break;
                 case VERY_HIGH:
-                    heat_led(ON);
-                    alarm(ON);
+                    heat_led(1);
+                    alarm(1);
             }
             break;
         case LOW:
             switch (td) {
                 case EVEN:
-                    fan_led(OFF);
-                    fan(OFF);
+                    fan_led(0);
+                    fan(0);
                     break
                 case HIGH:
-                    fan_led(OFF);
-                    fan(OFF);
-                    heat_led(ON);
+                    fan_led(0);
+                    fan(0);
+                    heat_led(1);
                     break;
                 case VERY_HIGH:
-                    fan_led(OFF);
-                    fan(OFF);
-                    heat_led(ON);
-                    alarm(ON);
+                    fan_led(0);
+                    fan(0);
+                    heat_led(1);
+                    alarm(1);
             }
             break;
         case HIGH:
             switch (td) {
                 case EVEN:
-                    heat_led(OFF);
+                    heat_led(0);
                     break;
                 case LOW:
-                    heat_led(OFF);
-                    fan_led(ON);
-                    fan(ON);
+                    heat_led(0);
+                    fan_led(1);
+                    fan(1);
                     break;
                 case VERY_HIGH:
-                    alarm(ON);
+                    alarm(1);
             }
             break;
         case VERY_HIGH:
             switch (td) {
                 case EVEN:
-                    heat_led(OFF);
-                    alarm(OFF);
+                    heat_led(0);
+                    alarm(0);
                     break;
                 case LOW:
-                    heat_led(OFF);
-                    alarm(OFF);
-                    fan_led(ON);
-                    fan(ON);
+                    heat_led(0);
+                    alarm(0);
+                    fan_led(1);
+                    fan(1);
                     break;
                 case HIGH:
-                    alarm(OFF);
+                    alarm(0);
             }
     }
     
