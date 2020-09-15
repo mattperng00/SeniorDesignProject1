@@ -21,9 +21,6 @@
 // include the library code:
 #include <LiquidCrystal.h>
 
-#define LCD_Rows 2
-#define LCD_Cols 16
-
 // Pin assignments
 #define LCD_RS 12
 #define LCD_ENABLE 11
@@ -42,7 +39,7 @@ int lastState = 0;
 
 void setup() {
   
-  pinMode(0, INPUT);
+  pinMode(0, INPUT); // Temp Switch
   pinMode(13, INPUT); //Increment
   Serial.begin(9600);
   Serial.println("--- Start Serial Monitor SEND_RCVE ---");
@@ -56,7 +53,7 @@ void setup() {
   
   
   // set up the LCD's number of columns and rows:
-  lcd.begin(LCD_Cols, LCD_Rows);
+  lcd.begin(16, 2);
   // Print a message to the LCD.
   lcd.setCursor(0,0);
   lcd.print("Temp: ");
@@ -72,6 +69,7 @@ void loop() {
   // set the cursor to column 0, line 1
   // (note: line 1 is the second row, since counting begins with 0):
   currTemp = -40 + 0.488155 * (analogRead(A0) - 20);
+    
   int tarTemp = set_temp;
   int Lasttemp = 0;
   buttonState = digitalRead(13);
@@ -87,39 +85,40 @@ void loop() {
     }
     else
     {
-      
+      //Serial.println("off");
     }
     delay(5);
   
-  
-  lastState = buttonState;
-    
+ 
   
   //if function so screen doesn't clear on every loop, otherwise screen flashes on every loop
   if(currTemp != pastTemp || tarTemp != Lasttemp)
   {
-     lcd.clear();
-     pastTemp = currTemp;
-     Serial.println(currTemp);
-
-     /* lcd.setCursor(0,0);
-     lcd.print("Temp");
-     lcd.setCursor(6, 0);
-     lcd.print(currTemp);
-     lcd.setCursor(9,0);
-     lcd.print("C"); */
+    lcd.clear();
+    pastTemp = currTemp;
     
+    if(digitalRead(0) == HIGH)
+    {
      lcd.setCursor(0,0);
      lcd.print("TTemp: ");
      lcd.setCursor(7,0);
      lcd.print(tarTemp);
      lcd.setCursor(10,0);
      lcd.print("C");
-   
-  }
-  else
-  {
-    Serial.println(currTemp);
+     Serial.println(currTemp); Serial.println("C");
+    }
+    else if(digitalRead(0) == LOW)
+    {
+     tarTemp = (tarTemp * 9/5) +32;
+     currTemp = (currTemp * 9/5) +32;
+     lcd.setCursor(0,0);
+     lcd.print("TTemp: ");
+     lcd.setCursor(7,0);
+     lcd.print(tarTemp);
+     lcd.setCursor(10,0);
+     lcd.print("F");
+     Serial.println(currTemp); Serial.println("F");
+    }
   }
   
   if(currTemp > tarTemp)
@@ -130,21 +129,22 @@ void loop() {
       digitalWrite(6, LOW); //Blue LED on
       digitalWrite(7, HIGH); // RED LED off
       digitalWrite(8, LOW); //  turn on fan
+      lcd.setCursor(0,1);
+      lcd.print("Fan On");
       if(digitalRead(10) == HIGH)
       {
         tone(9, 1200, 50);
-      delay(100);
-      tone(9, 1000, 50);
-      delay(100);
-      tone(9, 1200, 50);
-      delay(100);
-      noTone(9);
+      	delay(100);
+      	tone(9, 1000, 50);
+      	delay(100);
+      	tone(9, 1200, 50);
+      	delay(100);
+      	noTone(9);
       }
       else
       {
        noTone(9);
       }
-        
     }
     else
     {
