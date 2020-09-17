@@ -1,54 +1,45 @@
 /*
     Authors: Ifeanyi Orizu Jr.
     Filename: thermostat.c
-    Date: 
-    Description: 
 */
 
-// TODO: Fix the #include(s)
-#include <stdio.h>
 #include <LiquidCrystal.h>
-#include thermostat.h
-
-/* ------------------------------ IO and State definitions ------------------------------ */
-#define LCD_ROWS 2
-#define LCD_COLS 16
 
 // Pin assignments
-#define LCD_RS 12
-#define LCD_ENABLE 11
-#define LCD_D4 5
-#define LCD_D5 4
-#define LCD_D6 3
-#define LCD_D7 2
+#define LCD_RS 12;
+#define LCD_EN 11;
+#define LCD_D4 5;
+#define LCD_D5 4;
+#define LCD_D6 3;
+#define LCD_D7 2;
+#define FAN_LED 6;
+#define HEAT_LED 7;
+#define FAN 9;
+#define ALARM 8;
+#define TEMP_SENSOR A0;
 
-// TODO: Assign these IO pins
-#define FAN_LED 
-#define HEAT_LED 
-#define FAN 
-#define ALARM 
-#define TEMP_SENSOR A0
+void temp_ctrl(temp_diff td);
+enum temp_diff evaluate_temp(int nominal_temp);
+int read_temp();
+void update_display();
+void fan_led(int state);
+void heat_led(int state);
+void fan(int state);
+void alarm(int state);
 
-enum temp_diff {EVEN, LOW, HIGH, VERY_HIGH}
-enum temp_scale {CEL, FAHR} // Temperature will be handled internally as Celsius, but can be displayed as Celsius or Fahrenheit
+enum temp_scale {CEL, FAHR}; // Temperature will be handled internally as Celsius, but can be displayed as Celsius or Fahrenheit
+enum temp_diff {NO_ACTION, RAISE_TEMP, LOWER_TEMP, LOWER_TEMP_FAST};
 
 /* ------------------------------ State variables and Settings ------------------------------ */
-enum temp_diff current_temp_diff = EVEN;
+volatile enum temp_diff current_temp_diff = NO_ACTION;
 volatile enum temp_scale current_temp_scale = CEL;
 volatile int set_temp;
 
-LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
 void setup() {
-    
-    // TODO: Setup temp sensor
-    
-    // TODO: Setup set_temp input device(s)
-    attachInterrupt(digitalPinToInterrupt(), raise_temp_isr, LOW)
-    attachInterrupt(digitalPinToInterrupt(), lower_temp_isr, LOW)
-    
-    // TODO: Setup temp scale input
-    //attachInterrupt(digitalPinToInterrupt(), temp_scale_isr, LOW)
+    // Serial print out
+    Serial.begin(9600);
     
     // LEDs
     pinMode(FAN_LED, OUTPUT);
@@ -59,28 +50,123 @@ void setup() {
     pinMode(ALARM, OUTPUT);
   
     // LCD
-    lcd.begin(LCD_COLS, LCD_ROWS);
+    lcd.begin(16, 2);
 }
 
 void loop() {
+    int temp;
     enum temp_diff td;
     
-    while (;;) {
-        temp_diff = evaluate_temp(); // Read temp and compute new temp_diff state
-        temp_ctrl(temp_diff); // Configure hardware based on current and next temp_diff states
-        update_display(); // Update LCD
-        // TODO: Call a delay function that can be interrupted
+    while (1) {
+        temp = read_temp();
+        Serial.println(temp);
+        td = evaluate_temp(temp);
+        temp_ctrl(td);
+        update_display();
+        delay(50);
     }
+}
+
+/* ------------------------------ State functions ------------------------------ */
+
+void temp_ctrl(temp_diff td) {
+    
+    switch (current_temp_diff) {
+        case NO_ACTION:
+            switch (td) {
+                case RAISE_TEMP:
+                    heat_led(1);
+                    break;
+                case LOWER_TEMP:
+                    fan_led(1);
+                    fan(1);
+                    break;
+                case LOWER_TEMP_FAST:
+                    fan_led(1);
+                    fan(1);
+                    alarm(1);
+            }
+            break;
+        case RAISE_TEMP:
+            switch (td) {
+                case NO_ACTION:
+                    heat_led(0);
+                    break;
+                case LOWER_TEMP:
+                    heat_led(0);
+                    fan_led(1);
+                    fan(1);
+                    break;
+                case LOWER_TEMP_FAST:
+                    heat_led(0);
+                    fan_led(1);
+                    fan(1);                    
+                    alarm(1);
+            }
+            break;
+        case LOWER_TEMP:
+            switch (td) {
+                case NO_ACTION:
+                    fan_led(0);
+                    fan(0);
+                    break;
+                case RAISE_TEMP:
+                    fan_led(0);
+                    fan(0);
+                    heat_led(1);
+                    break;
+                case LOWER_TEMP_FAST:
+                    alarm(1);
+            }
+            break;
+        case LOWER_TEMP_FAST:
+            switch (td) {
+                case NO_ACTION:
+                    fan_led(0);
+                    fan(0);
+                    alarm(0);
+                    break;
+                case RAISE_TEMP:
+                    fan_led(0);
+                    fan(0);
+                    alarm(0);
+                    heat_led(1);
+                    break;
+                case LOWER_TEMP:
+                    alarm(0);
+            }
+    }
+    
+    current_temp_diff = td;
+}
+
+enum temp_diff evaluate_temp(int nominal_temp) {
+    enum temp_diff td;
+    
+    noInterrupts();
+    if (nominal_temp > set_temp) {
+        if (nominal_temp - set_temp >= 10) {
+            td = LOWER_TEMP_FAST;
+        }
+        else {
+            td = LOWER_TEMP;
+        }
+    }
+    else if (nominal_temp < set_temp) {
+        td = RAISE_TEMP;
+    }
+    else {
+        td = NO_ACTION;
+    }
+    interrupts();
+    
+    return td;
 }
 
 /* ------------------------------ IO functions ------------------------------ */
 
 int read_temp() {
-    return -40 + 0.488155 * (analogRead(TEMP_SENSOR) - 20);
-}
-
-bool read_switch() {
-    
+    return 0.488155*(analogRead(TEMP_SENSOR) - 20) - 40;
 }
 
 void update_display() {
@@ -98,146 +184,50 @@ void update_display() {
     
     lcd.setCursor(0, 1);
     switch (current_temp_diff) {
-        case EVEN:
-            lcd.print("");
+        case NO_ACTION:
+            lcd.print("       ");
             break;
-        case LOW:
-            lcd.print("FAN ON");
+        case RAISE_TEMP:
+            lcd.print("FAN ON ");
             break;
-        case HIGH:
-        case VERY_HIGH:
+        case LOWER_TEMP:
+        case LOWER_TEMP_FAST:
             lcd.print("HEAT ON");
     }
 }
 
 void fan_led(int state) {
-    digitalWrite(FAN_LED, state ? HIGH : LOW);
+    if (state) {
+        digitalWrite(FAN_LED, HIGH);
+    }
+    else {
+        digitalWrite(FAN_LED, LOW);
+    }
 }
 
 void heat_led(int state) {
-    digitalWrite(HEAT_LED, state ? HIGH : LOW);
+    if (state) {
+        digitalWrite(HEAT_LED, HIGH);
+    }
+    else {
+        digitalWrite(HEAT_LED, LOW);
+    }
 }
 
 void fan(int state) {
-    // TODO: Turn fan motor on off based on state
+    if (state) {
+        digitalWrite(FAN, HIGH);
+    }
+    else {
+        digitalWrite(FAN, LOW);
+    }
 }
 
 void alarm(int state) {
-    // TODO: Turn alarm on off based on state
-}
-
-/* ------------------------------ State functions ------------------------------ */
-
-void temp_ctrl(temp_diff td) {
-    if (td == current_temp_diff) {
-        return;
-    }
-    
-    switch (current_temp_diff) {
-        case EVEN:
-            switch (td) {
-                case LOW:
-                    fan_led(1);
-                    fan(1);
-                    break;
-                case HIGH:
-                    heat_led(1);
-                    break;
-                case VERY_HIGH:
-                    heat_led(1);
-                    alarm(1);
-            }
-            break;
-        case LOW:
-            switch (td) {
-                case EVEN:
-                    fan_led(0);
-                    fan(0);
-                    break
-                case HIGH:
-                    fan_led(0);
-                    fan(0);
-                    heat_led(1);
-                    break;
-                case VERY_HIGH:
-                    fan_led(0);
-                    fan(0);
-                    heat_led(1);
-                    alarm(1);
-            }
-            break;
-        case HIGH:
-            switch (td) {
-                case EVEN:
-                    heat_led(0);
-                    break;
-                case LOW:
-                    heat_led(0);
-                    fan_led(1);
-                    fan(1);
-                    break;
-                case VERY_HIGH:
-                    alarm(1);
-            }
-            break;
-        case VERY_HIGH:
-            switch (td) {
-                case EVEN:
-                    heat_led(0);
-                    alarm(0);
-                    break;
-                case LOW:
-                    heat_led(0);
-                    alarm(0);
-                    fan_led(1);
-                    fan(1);
-                    break;
-                case HIGH:
-                    alarm(0);
-            }
-    }
-    
-    current_temp_diff = td;
-}
-
-enum temp_diff evaluate_temp() {
-    int nominal_temp = read_temp();
-    enum temp_diff td;
-    
-    noInterrupts();
-    if (nominal_temp > set_temp) {
-        if (nominal_temp - set_temp >= 10) {
-            td = VERY_HIGH;
-        }
-        else {
-            td = HIGH;
-        }
-    }
-    else if (nominal_temp < set_temp) {
-        td = LOW;
+    if (state) {
+        tone(ALARM, 300, 1000);
     }
     else {
-        td = EVEN;
+        noTone(ALARM);
     }
-    interrupts();
-    
-    return td;
 }
-
-/* ------------------------------ ISRs ------------------------------ */
-
-void raise_temp_isr() {
-    set_temp += 1;
-}
-
-void lower_temp_isr() {
-    set_temp -= 1;
-}
-
-void temp_scale_isr() {
-    temp_scale = (temp_scale == FAHR) ? CEL : FAHR;
-    //update_display();
-}
-
-
-
