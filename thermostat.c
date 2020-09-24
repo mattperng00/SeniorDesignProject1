@@ -11,13 +11,13 @@
 #define LCD_COLS 16
 #define LCD_ROWS 2
 #define BAUD_RATE 9600
-#define TEMP_READ_FREQ 10
+#define TEMP_READ_FREQ 5
 #define ALARM_FREQ 600
 #define ALARM_DURATION 1000
 
 // Pin assignments
 #define LCD_RS 12
-#define LCD_EN 11
+#define LCD_EN 11              
 #define LCD_D4 5
 #define LCD_D5 4
 #define LCD_D6 3
@@ -31,28 +31,28 @@
 #define TEMP_DEC 
 #define TEMP_SCALE 
 
+// Enumerated types
+enum temp_scale {CEL, FAHR};
+enum temp_status {NO_ACTION, RAISE_TEMP, LOWER_TEMP, LOWER_TEMP_ALARM};
+
 // Function prototypes
-enum temp_status evaluate_temp(float nominal_temp);
+temp_status evaluate_temp(float nominal_temp);
 void temp_ctrl(temp_status ts);
 float read_temp();
 void serial_print(float nominal_temp);
 void update_display();
-void fan_led_driver(int state);
-void heat_led_driver(int state);
-void fan_driver(int state);
-void alarm_driver(int state);
-
-// Enumerated types
-enum temp_scale {CEL, FAHR}; // Temperature will be handled internally as Celsius, but can be displayed as Celsius or Fahrenheit
-enum temp_status {NO_ACTION, RAISE_TEMP, LOWER_TEMP, LOWER_TEMP_ALARM};
+void fan_led_driver(bool active);
+void heat_led_driver(bool active);
+void fan_driver(bool active);
+void alarm_driver(bool active);
 
 /* ------------------------------ State variables and Settings ------------------------------ */
-volatile enum temp_status current_temp_status = NO_ACTION;
-volatile enum temp_scale current_temp_scale = CEL;
-volatile float set_temp;
+volatile temp_status current_temp_status = NO_ACTION;
+volatile temp_scale current_temp_scale = CEL;
+volatile float set_temp = 25; // Temperature will be handled internally as Celsius, but can be displayed as Celsius or Fahrenheit
 LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 
-void setup() {
+void setup() { // TODO: This is an IO function tbh
     // Serial print out
     Serial.begin(BAUD_RATE);
     
@@ -68,9 +68,11 @@ void setup() {
     lcd.begin(LCD_COLS, LCD_ROWS);
     
     // Interrupts
-    attachInterrupt(digitalPinToInterrupt(TEMP_SCALE), temp_scale_isr, ); // LOW, CHANGE, RISING, FALLING https://www.arduino.cc/reference/en/language/functions/external-interrupts/attachinterrupt/
-    attachInterrupt(digitalPinToInterrupt(TEMP_INC), increment_temp_isr, );
-    attachInterrupt(digitalPinToInterrupt(TEMP_DEC), decrement_temp_isr, );
+    
+    // TODO: LOW, CHANGE, RISING, FALLING https://www.arduino.cc/reference/en/language/functions/external-interrupts/attachinterrupt/
+    //attachInterrupt(digitalPinToInterrupt(TEMP_SCALE), temp_scale_isr, );
+    //attachInterrupt(digitalPinToInterrupt(TEMP_INC), increment_temp_isr, );
+    //attachInterrupt(digitalPinToInterrupt(TEMP_DEC), decrement_temp_isr, );
 }
 
 
@@ -78,28 +80,24 @@ void setup() {
 
 void loop() {
     float temp;
-    enum temp_status ts;
+    temp_status ts;
     
-    while (1) {
+    while (true) {
         temp = read_temp();
         serial_print(temp);
         ts = evaluate_temp(temp);
         temp_ctrl(ts);
         update_display();
-        delay(1000/TEMP_READ_FREQ); // TODO: I want this evaluated at compile time
+        delay(1000/TEMP_READ_FREQ);
     }
 }
 
 enum temp_status evaluate_temp(float nominal_temp) {
-    float temp_difference;
-    enum temp_status ts;
-    
-    noInterrupts();
-    temp_difference = (current_temp_scale == CEL) ? (nominal_temp - set_temp) : 9*(nominal_temp - set_temp)/5;
-    interrupts();
+    float temp_difference = nominal_temp - set_temp;
+    temp_status ts;
     
     if (temp_difference > 0) {
-        if (temp_difference >= 10) { // TODO: If it's in FAHR mode shouldn't the alarm threshold be 10 (F), not 10 (C)?
+        if (temp_difference >= 10) {
             ts = LOWER_TEMP_ALARM;
         }
         else {
@@ -116,31 +114,31 @@ enum temp_status evaluate_temp(float nominal_temp) {
     return ts;
 }
 
-void temp_ctrl(enum temp_status ts) {
+void temp_ctrl(temp_status ts) {
     switch (ts) {
         case NO_ACTION:
-            heat_led_driver(0);
-            fan_led_driver(0);
-            fan_driver(0);
-            alarm_driver(0);
+            heat_led_driver(false);
+            fan_led_driver(false);
+            fan_driver(false);
+            alarm_driver(false);
             break;
         case RAISE_TEMP:
-            heat_led_driver(1);
-            fan_led_driver(0);
-            fan_driver(0);
-            alarm_driver(0);
+            heat_led_driver(true);
+            fan_led_driver(false);
+            fan_driver(false);
+            alarm_driver(false);
             break;
         case LOWER_TEMP:
-            heat_led_driver(0);
-            fan_led_driver(1);
-            fan_driver(1);
-            alarm_driver(0);
+            heat_led_driver(false);
+            fan_led_driver(true);
+            fan_driver(true);
+            alarm_driver(false);
             break;
         case LOWER_TEMP_ALARM:
-            heat_led_driver(0);
-            fan_led_driver(1);
-            fan_driver(1);
-            alarm_driver(1);
+            heat_led_driver(false);
+            fan_led_driver(true);
+            fan_driver(true);
+            alarm_driver(true);
     }
     current_temp_status = ts;
 }
@@ -152,7 +150,8 @@ float read_temp() { // TODO: Wrong formula according to Nate U (Looked jank to m
     return 0.488155*(analogRead(TEMP_SENSOR) - 20) - 40;
 }
 
-void serial_print(float nominal_temp) { // TODO: Is this a crtical section?
+void serial_print(float nominal_temp) {
+    // TODO: current_temp_scale can change during the switch condition evaluation -> This is actitical section
     switch (current_temp_scale) {
         case CEL:
             Serial.print((int)nominal_temp);
@@ -192,8 +191,8 @@ void update_display() {
     }
 }
 
-void fan_led_driver(int state) {
-    if (state) {
+void fan_led_driver(bool active) {
+    if (active) {
         digitalWrite(FAN_LED, LOW);
     }
     else {
@@ -201,8 +200,8 @@ void fan_led_driver(int state) {
     }
 }
 
-void heat_led_driver(int state) {
-    if (state) {
+void heat_led_driver(bool active) {
+    if (active) {
         digitalWrite(HEAT_LED, LOW);
     }
     else {
@@ -210,8 +209,8 @@ void heat_led_driver(int state) {
     }
 }
 
-void fan_driver(int state) {
-    if (state) {
+void fan_driver(bool active) {
+    if (active) {
         digitalWrite(FAN, LOW);
     }
     else {
@@ -219,8 +218,8 @@ void fan_driver(int state) {
     }
 }
 
-void alarm_driver(int state) {
-    if (state) {
+void alarm_driver(bool active) {
+    if (active) {
         tone(ALARM, ALARM_FREQ, ALARM_DURATION);
     }
     else {
